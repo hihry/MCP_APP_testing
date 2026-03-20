@@ -501,6 +501,14 @@ server.registerResource(
   {
     mimeType: MIME,
     description: "Interactive test case approval table with toggles and bulk actions",
+    _meta: {
+      ui: {
+        csp: {
+          connectDomains: [],   // self-contained — no external network calls
+          resourceDomains: [],  // no external assets
+        },
+      },
+    },
   },
   async (uri) => {
     const session = latestSession;
@@ -527,6 +535,14 @@ server.registerResource(
   {
     mimeType: MIME,
     description: "Visual side-by-side diff viewer for self-healing patch approval",
+    _meta: {
+      ui: {
+        csp: {
+          connectDomains: [],   // self-contained — no external network calls
+          resourceDomains: [],  // no external assets
+        },
+      },
+    },
   },
   async (uri) => {
     const session = latestSession;
