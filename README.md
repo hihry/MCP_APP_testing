@@ -30,7 +30,6 @@ A working MCP server demonstrating the core pipeline: LLM test generation → in
 
 ```bash
 git clone <repo>
-cd apidash-agent-mcp
 npm install
 npm run build
 ```
