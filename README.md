@@ -30,20 +30,30 @@ A working MCP server demonstrating the core pipeline: LLM test generation → in
 
 ```bash
 git clone <repo>
+cd apidash-agent-mcp
 npm install
 npm run build
 ```
 
 Set your API key:
 ```bash
+# macOS/Linux
 export ANTHROPIC_API_KEY=sk-ant-...
+
+# Windows PowerShell (current terminal session)
+$env:ANTHROPIC_API_KEY="sk-ant-..."
+
+# Windows PowerShell (persist for new terminals)
+setx ANTHROPIC_API_KEY "sk-ant-..."
 ```
+
+If you use `setx`, restart VS Code Insiders so it picks up the updated environment variable.
 
 ---
 
 ## Running in VS Code Insiders
 
-Create `.vscode/mcp.json` in any open folder:
+Create `.vscode/mcp.json` in this repo root (`.vscode/mcp.json` is local-only and gitignored):
 
 ```json
 {
@@ -51,7 +61,7 @@ Create `.vscode/mcp.json` in any open folder:
     "apidash-agent": {
       "type": "stdio",
       "command": "node",
-      "args": ["/absolute/path/to/apidash-agent-mcp/dist/index.js"],
+      "args": ["<absolute-path-to-repo>/dist/index.js"],
       "env": {
         "ANTHROPIC_API_KEY": "${env:ANTHROPIC_API_KEY}"
       }
@@ -59,6 +69,8 @@ Create `.vscode/mcp.json` in any open folder:
   }
 }
 ```
+
+Windows example path: `C:/Users/your-user/path/to/apidash-agent-mcp/dist/index.js`.
 
 Open VS Code Insiders Copilot Chat in Agent mode.
 
