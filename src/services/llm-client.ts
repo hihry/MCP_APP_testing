@@ -108,8 +108,84 @@ export async function generateTestsForEndpoints(
 
 // ─── Rule-Based Fallback ─────────────────────────────────────────────────────
 
+function pickSuccessStatus(endpoint: ApiEndpoint): number {
+  const responseCodes = Object.keys(endpoint.responses)
+    .filter((code) => /^\d+$/.test(code))
+    .map((code) => Number(code))
+    .filter((code) => Number.isInteger(code));
+
+  const successCodes = responseCodes
+    .filter((code) => code >= 200 && code < 300)
+    .sort((a, b) => a - b);
+
+  if (successCodes.length > 0) {
+    return successCodes[0];
+  }
+
+  // Sensible default when spec has only "default" response.
+  return 200;
+}
+
+function parameterExample(endpoint: ApiEndpoint, name: string): string | number {
+  const param = endpoint.parameters.find((p) => p.name === name);
+  if (!param) return 1;
+
+  if (param.schema.example !== undefined) {
+    return param.schema.example as string | number;
+  }
+
+  if (param.schema.type === "string") {
+    if (name.toLowerCase().includes("status")) return "available";
+    return "sample";
+  }
+
+  return 1;
+}
+
+function buildSafeRequestBody(endpoint: ApiEndpoint): Record<string, unknown> | undefined {
+  const example = endpoint.requestBody?.example;
+  if (!example) return undefined;
+
+  const body: Record<string, unknown> = { ...example };
+
+  // Keep mutable resources unique to reduce conflicts on public Petstore backend.
+  if (endpoint.path === "/user") {
+    body.username = `testuser_${Date.now()}`;
+  }
+
+  if (endpoint.path === "/store/order") {
+    body.id = 10;
+    body.petId = 1;
+    body.quantity = 1;
+    body.status = "placed";
+    body.complete = false;
+  }
+
+  if (endpoint.path === "/pet") {
+    body.id = 1;
+    body.status = body.status ?? "available";
+  }
+
+  return body;
+}
+
 function buildFallbackTest(endpoint: ApiEndpoint, counter: number): ApiTestCase {
-  const successCode = endpoint.method === "POST" ? 201 : 200;
+  const successCode = pickSuccessStatus(endpoint);
+
+  const pathParams = endpoint.parameters
+    .filter((p) => p.in === "path")
+    .reduce<Record<string, string | number>>((acc, p) => {
+      acc[p.name] = parameterExample(endpoint, p.name);
+      return acc;
+    }, {});
+
+  const queryParams = endpoint.parameters
+    .filter((p) => p.in === "query")
+    .reduce<Record<string, string | number>>((acc, p) => {
+      acc[p.name] = parameterExample(endpoint, p.name);
+      return acc;
+    }, {});
+
   return {
     id: `tc_${String(counter).padStart(3, "0")}`,
     name: `[Fallback] ${endpoint.method} ${endpoint.path} — status check`,
@@ -118,14 +194,9 @@ function buildFallbackTest(endpoint: ApiEndpoint, counter: number): ApiTestCase 
     endpoint: `${endpoint.method} ${endpoint.path}`,
     method: endpoint.method,
     path: endpoint.path,
-    pathParams: endpoint.parameters
-      .filter((p) => p.in === "path")
-      .reduce<Record<string, number>>((acc, p) => {
-        acc[p.name] = (p.schema.example as number) ?? 1;
-        return acc;
-      }, {}),
-    queryParams: {},
-    requestBody: endpoint.requestBody?.example ?? undefined,
+    pathParams,
+    queryParams,
+    requestBody: buildSafeRequestBody(endpoint),
     assertions: [
       { field: "response.status", operator: "equals", expected: successCode },
     ],
