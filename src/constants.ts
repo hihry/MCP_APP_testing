@@ -1,24 +1,213 @@
-import type { ParsedSpec, ApiEndpoint } from "./types.js";
+// import type { ParsedSpec, ApiEndpoint } from "./types.js";
 
-export const BASE_URL = "https://jsonplaceholder.typicode.com";
+// export const BASE_URL = "https://jsonplaceholder.typicode.com";
 
-// ─── Hardcoded JSONPlaceholder OpenAPI Spec (simplified) ───────────────────
-// In the full system this comes from SpecParser ingesting a real YAML/JSON file
+// // ─── Hardcoded JSONPlaceholder OpenAPI Spec (simplified) ───────────────────
+// // In the full system this comes from SpecParser ingesting a real YAML/JSON file
 
-export const JSONPLACEHOLDER_SPEC: ParsedSpec = {
-  title: "JSONPlaceholder API",
+// export const JSONPLACEHOLDER_SPEC: ParsedSpec = {
+//   title: "JSONPlaceholder API",
+//   baseUrl: BASE_URL,
+//   version: "1.0.0",
+//   sessionId: "",          // filled at runtime
+//   endpoints: [
+//     {
+//       method: "GET",
+//       path: "/users",
+//       summary: "List all users",
+//       parameters: [],
+//       responses: {
+//         "200": {
+//           description: "Array of user objects",
+//           schema: {
+//             type: "array",
+//             items: {
+//               type: "object",
+//               properties: {
+//                 id:       { type: "integer" },
+//                 name:     { type: "string" },
+//                 username: { type: "string" },
+//                 email:    { type: "string" },
+//               },
+//             },
+//           },
+//         },
+//       },
+//       tags: ["users"],
+//     },
+//     {
+//       method: "GET",
+//       path: "/users/{id}",
+//       summary: "Get a user by ID",
+//       parameters: [
+//         {
+//           name: "id",
+//           in: "path",
+//           required: true,
+//           schema: { type: "integer", example: 1 },
+//           description: "User ID",
+//         },
+//       ],
+//       responses: {
+//         "200": {
+//           description: "User object",
+//           schema: {
+//             type: "object",
+//             properties: {
+//               id:       { type: "integer" },
+//               name:     { type: "string" },
+//               username: { type: "string" },
+//               email:    { type: "string" },
+//               address:  { type: "object" },
+//               phone:    { type: "string" },
+//               website:  { type: "string" },
+//               company:  { type: "object" },
+//             },
+//           },
+//         },
+//         "404": { description: "User not found" },
+//       },
+//       tags: ["users"],
+//     },
+//     {
+//       method: "GET",
+//       path: "/posts",
+//       summary: "List all posts",
+//       parameters: [
+//         {
+//           name: "userId",
+//           in: "query",
+//           required: false,
+//           schema: { type: "integer", example: 1 },
+//           description: "Filter posts by user ID",
+//         },
+//       ],
+//       responses: {
+//         "200": {
+//           description: "Array of post objects",
+//           schema: {
+//             type: "array",
+//             items: {
+//               type: "object",
+//               properties: {
+//                 id:     { type: "integer" },
+//                 userId: { type: "integer" },
+//                 title:  { type: "string" },
+//                 body:   { type: "string" },
+//               },
+//             },
+//           },
+//         },
+//       },
+//       tags: ["posts"],
+//     },
+//     {
+//       method: "POST",
+//       path: "/posts",
+//       summary: "Create a new post",
+//       parameters: [],
+//       requestBody: {
+//         required: true,
+//         schema: {
+//           type: "object",
+//           required: ["title", "body", "userId"],
+//           properties: {
+//             title:  { type: "string" },
+//             body:   { type: "string" },
+//             userId: { type: "integer" },
+//           },
+//         },
+//         example: { title: "Test Post", body: "Hello world", userId: 1 },
+//       },
+//       responses: {
+//         "201": {
+//           description: "Created post object with generated ID",
+//           schema: {
+//             type: "object",
+//             properties: {
+//               id:     { type: "integer" },
+//               title:  { type: "string" },
+//               body:   { type: "string" },
+//               userId: { type: "integer" },
+//             },
+//           },
+//         },
+//       },
+//       tags: ["posts"],
+//     },
+//   ],
+// };
+
+// // ─── Drift Simulation ───────────────────────────────────────────────────────
+// // Simulates v2 of the API where user.id changed from integer → string
+// // This is what SelfHealingEngine detects in the POC
+
+// export const DRIFTED_USER_RESPONSE = {
+//   id: "usr_1",           // BREAKING: was integer 1, now string "usr_1"
+//   name: "Leanne Graham",
+//   username: "Bret",
+//   email: "Sincere@april.biz",
+//   address: {
+//     street: "Kulas Light",
+//     city: "Gwenborough",
+//   },
+//   phone: "1-770-736-0988 x56442",
+//   website: "hildegard.org",
+//   company: { name: "Romaguera-Crona" },
+// };
+
+// // The original assertion that breaks against drifted response
+// export const ORIGINAL_ID_ASSERTION = {
+//   field: "response.body.id",
+//   operator: "type_is" as const,
+//   expected: "integer",
+// };
+
+// // The healed assertion that works with the new response
+// export const HEALED_ID_ASSERTION = {
+//   field: "response.body.id",
+//   operator: "type_is" as const,
+//   expected: "string",
+// };
+
+// export const CHARACTER_LIMIT = 50_000;
+
+import type { ParsedSpec } from "./types.js";
+
+export const BASE_URL = "https://petstore3.swagger.io/api/v3";
+
+// ─── Hardcoded Petstore OpenAPI 3.0 Spec ────────────────────────────────────
+// Source: https://petstore3.swagger.io/api/v3/openapi.json
+// 10 endpoints across pet / store / user tags
+
+export const PETSTORE_SPEC: ParsedSpec = {
+  title: "Swagger Petstore - OpenAPI 3.0",
   baseUrl: BASE_URL,
-  version: "1.0.0",
-  sessionId: "",          // filled at runtime
+  version: "1.0.11",
+  sessionId: "",   // filled at runtime by session store
   endpoints: [
+
+    // ── PET endpoints ──────────────────────────────────────────────────────
+
     {
       method: "GET",
-      path: "/users",
-      summary: "List all users",
-      parameters: [],
+      path: "/pet/findByStatus",
+      summary: "Finds Pets by status",
+      parameters: [
+        {
+          name: "status",
+          in: "query",
+          required: false,
+          schema: {
+            type: "string",
+            example: "available",
+          },
+          description: "Status values that need to be considered for filter. One of: available, pending, sold",
+        },
+      ],
       responses: {
         "200": {
-          description: "Array of user objects",
+          description: "Successful operation — array of Pet objects",
           schema: {
             type: "array",
             items: {
@@ -26,144 +215,332 @@ export const JSONPLACEHOLDER_SPEC: ParsedSpec = {
               properties: {
                 id:       { type: "integer" },
                 name:     { type: "string" },
-                username: { type: "string" },
-                email:    { type: "string" },
+                status:   { type: "string" },
+                category: { type: "object" },
+                photoUrls:{ type: "array" },
+                tags:     { type: "array" },
               },
             },
           },
         },
+        "400": { description: "Invalid status value" },
       },
-      tags: ["users"],
+      tags: ["pet"],
     },
+
     {
       method: "GET",
-      path: "/users/{id}",
-      summary: "Get a user by ID",
+      path: "/pet/{petId}",
+      summary: "Find pet by ID",
       parameters: [
         {
-          name: "id",
+          name: "petId",
           in: "path",
           required: true,
           schema: { type: "integer", example: 1 },
-          description: "User ID",
+          description: "ID of pet to return",
         },
       ],
       responses: {
         "200": {
-          description: "User object",
+          description: "Successful operation",
           schema: {
             type: "object",
             properties: {
-              id:       { type: "integer" },
-              name:     { type: "string" },
-              username: { type: "string" },
-              email:    { type: "string" },
-              address:  { type: "object" },
-              phone:    { type: "string" },
-              website:  { type: "string" },
-              company:  { type: "object" },
+              id:        { type: "integer" },
+              name:      { type: "string" },
+              status:    { type: "string" },
+              category:  { type: "object" },
+              photoUrls: { type: "array" },
+              tags:      { type: "array" },
             },
           },
         },
-        "404": { description: "User not found" },
+        "400": { description: "Invalid ID supplied" },
+        "404": { description: "Pet not found" },
       },
-      tags: ["users"],
+      tags: ["pet"],
     },
-    {
-      method: "GET",
-      path: "/posts",
-      summary: "List all posts",
-      parameters: [
-        {
-          name: "userId",
-          in: "query",
-          required: false,
-          schema: { type: "integer", example: 1 },
-          description: "Filter posts by user ID",
-        },
-      ],
-      responses: {
-        "200": {
-          description: "Array of post objects",
-          schema: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                id:     { type: "integer" },
-                userId: { type: "integer" },
-                title:  { type: "string" },
-                body:   { type: "string" },
-              },
-            },
-          },
-        },
-      },
-      tags: ["posts"],
-    },
+
     {
       method: "POST",
-      path: "/posts",
-      summary: "Create a new post",
+      path: "/pet",
+      summary: "Add a new pet to the store",
       parameters: [],
       requestBody: {
         required: true,
         schema: {
           type: "object",
-          required: ["title", "body", "userId"],
+          required: ["name", "photoUrls"],
           properties: {
-            title:  { type: "string" },
-            body:   { type: "string" },
-            userId: { type: "integer" },
+            id:        { type: "integer" },
+            name:      { type: "string" },
+            status:    { type: "string" },
+            category:  { type: "object" },
+            photoUrls: { type: "array" },
+            tags:      { type: "array" },
           },
         },
-        example: { title: "Test Post", body: "Hello world", userId: 1 },
+        example: {
+          name: "doggie",
+          photoUrls: ["https://example.com/dog.jpg"],
+          status: "available",
+        },
       },
       responses: {
-        "201": {
-          description: "Created post object with generated ID",
+        "200": { description: "Successful operation — created Pet object" },
+        "405": { description: "Invalid input" },
+      },
+      tags: ["pet"],
+    },
+
+    {
+      method: "PUT",
+      path: "/pet",
+      summary: "Update an existing pet",
+      parameters: [],
+      requestBody: {
+        required: true,
+        schema: {
+          type: "object",
+          required: ["name", "photoUrls"],
+          properties: {
+            id:        { type: "integer" },
+            name:      { type: "string" },
+            status:    { type: "string" },
+            photoUrls: { type: "array" },
+          },
+        },
+        example: {
+          id: 1,
+          name: "doggie-updated",
+          photoUrls: ["https://example.com/dog.jpg"],
+          status: "sold",
+        },
+      },
+      responses: {
+        "200": { description: "Successful operation" },
+        "400": { description: "Invalid ID supplied" },
+        "404": { description: "Pet not found" },
+        "405": { description: "Validation exception" },
+      },
+      tags: ["pet"],
+    },
+
+    {
+      method: "DELETE",
+      path: "/pet/{petId}",
+      summary: "Deletes a pet by ID",
+      parameters: [
+        {
+          name: "petId",
+          in: "path",
+          required: true,
+          schema: { type: "integer", example: 1 },
+          description: "Pet ID to delete",
+        },
+      ],
+      responses: {
+        "200": { description: "Successful operation" },
+        "400": { description: "Invalid pet value" },
+      },
+      tags: ["pet"],
+    },
+
+    // ── STORE endpoints ────────────────────────────────────────────────────
+
+    {
+      method: "GET",
+      path: "/store/inventory",
+      summary: "Returns pet inventories by status",
+      parameters: [],
+      responses: {
+        "200": {
+          description: "Successful operation — map of status codes to quantities",
+          schema: {
+            type: "object",
+            additionalProperties: { type: "integer" },
+          },
+        },
+      },
+      tags: ["store"],
+    },
+
+    {
+      method: "POST",
+      path: "/store/order",
+      summary: "Place an order for a pet",
+      parameters: [],
+      requestBody: {
+        required: true,
+        schema: {
+          type: "object",
+          properties: {
+            id:       { type: "integer" },
+            petId:    { type: "integer" },
+            quantity: { type: "integer" },
+            shipDate: { type: "string" },
+            status:   { type: "string" },
+            complete: { type: "boolean" },
+          },
+        },
+        example: {
+          petId: 1,
+          quantity: 1,
+          status: "placed",
+          complete: false,
+        },
+      },
+      responses: {
+        "200": {
+          description: "Successful operation — Order object",
           schema: {
             type: "object",
             properties: {
-              id:     { type: "integer" },
-              title:  { type: "string" },
-              body:   { type: "string" },
-              userId: { type: "integer" },
+              id:       { type: "integer" },
+              petId:    { type: "integer" },
+              quantity: { type: "integer" },
+              status:   { type: "string" },
+              complete: { type: "boolean" },
             },
           },
         },
+        "405": { description: "Invalid input" },
       },
-      tags: ["posts"],
+      tags: ["store"],
     },
+
+    {
+      method: "GET",
+      path: "/store/order/{orderId}",
+      summary: "Find purchase order by ID",
+      parameters: [
+        {
+          name: "orderId",
+          in: "path",
+          required: true,
+          schema: { type: "integer", example: 1 },
+          description: "ID of the order to fetch. Use IDs between 1 and 10.",
+        },
+      ],
+      responses: {
+        "200": {
+          description: "Successful operation — Order object",
+          schema: {
+            type: "object",
+            properties: {
+              id:       { type: "integer" },
+              petId:    { type: "integer" },
+              quantity: { type: "integer" },
+              status:   { type: "string" },
+              complete: { type: "boolean" },
+            },
+          },
+        },
+        "400": { description: "Invalid ID supplied" },
+        "404": { description: "Order not found" },
+      },
+      tags: ["store"],
+    },
+
+    // ── USER endpoints ─────────────────────────────────────────────────────
+
+    {
+      method: "POST",
+      path: "/user",
+      summary: "Create user",
+      parameters: [],
+      requestBody: {
+        required: true,
+        schema: {
+          type: "object",
+          properties: {
+            id:         { type: "integer" },
+            username:   { type: "string" },
+            firstName:  { type: "string" },
+            lastName:   { type: "string" },
+            email:      { type: "string" },
+            password:   { type: "string" },
+            phone:      { type: "string" },
+            userStatus: { type: "integer" },
+          },
+        },
+        example: {
+          username: "testuser",
+          firstName: "John",
+          lastName: "Doe",
+          email: "john@example.com",
+          password: "secret",
+          phone: "1234567890",
+          userStatus: 1,
+        },
+      },
+      responses: {
+        "200": { description: "Successful operation" },
+        "default": { description: "Successful operation" },
+      },
+      tags: ["user"],
+    },
+
+    {
+      method: "GET",
+      path: "/user/{username}",
+      summary: "Get user by username",
+      parameters: [
+        {
+          name: "username",
+          in: "path",
+          required: true,
+          schema: { type: "string", example: "theUser" },
+          description: "The username to fetch. Use 'theUser' for a reliable test.",
+        },
+      ],
+      responses: {
+        "200": {
+          description: "Successful operation — User object",
+          schema: {
+            type: "object",
+            properties: {
+              id:         { type: "integer" },
+              username:   { type: "string" },
+              firstName:  { type: "string" },
+              lastName:   { type: "string" },
+              email:      { type: "string" },
+              phone:      { type: "string" },
+              userStatus: { type: "integer" },
+            },
+          },
+        },
+        "400": { description: "Invalid username supplied" },
+        "404": { description: "User not found" },
+      },
+      tags: ["user"],
+    },
+
   ],
 };
 
-// ─── Drift Simulation ───────────────────────────────────────────────────────
-// Simulates v2 of the API where user.id changed from integer → string
-// This is what SelfHealingEngine detects in the POC
+// ─── Drift Simulation ────────────────────────────────────────────────────────
+// Simulates a v2 API where Pet.id changed from integer → string prefix format
+// e.g. 1 → "pet_1"  (a common migration when moving to distributed IDs)
 
-export const DRIFTED_USER_RESPONSE = {
-  id: "usr_1",           // BREAKING: was integer 1, now string "usr_1"
-  name: "Leanne Graham",
-  username: "Bret",
-  email: "Sincere@april.biz",
-  address: {
-    street: "Kulas Light",
-    city: "Gwenborough",
-  },
-  phone: "1-770-736-0988 x56442",
-  website: "hildegard.org",
-  company: { name: "Romaguera-Crona" },
+export const DRIFTED_PET_RESPONSE = {
+  id: "pet_1",           // BREAKING: was integer 1, now string "pet_1"
+  name: "doggie",
+  status: "available",
+  category: { id: 1, name: "Dogs" },
+  photoUrls: ["https://example.com/dog.jpg"],
+  tags: [{ id: 0, name: "cute" }],
 };
 
-// The original assertion that breaks against drifted response
+// The original assertion that breaks when drift occurs
 export const ORIGINAL_ID_ASSERTION = {
   field: "response.body.id",
   operator: "type_is" as const,
   expected: "integer",
 };
 
-// The healed assertion that works with the new response
+// The healed assertion — works with the new string-prefixed ID format
 export const HEALED_ID_ASSERTION = {
   field: "response.body.id",
   operator: "type_is" as const,
