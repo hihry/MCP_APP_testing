@@ -104,6 +104,10 @@ generate tests for the users endpoints
 ```
 *Shows: LLM generates 6-8 test cases, then the **test-review MCP App** opens — an interactive toggle table where you can enable/disable individual tests and hit "Confirm & Begin Execution"*
 
+![Test Review and Approval screen showing generated tests awaiting user confirmation](docs/images/test-review-approval.png)
+
+*The execution only begins after manual approval: review the selected tests, then click **Confirm & Begin Execution**.*
+
 ### Step 3 — Execute (normal run)
 ```
 execute the approved tests
