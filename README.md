@@ -5,6 +5,22 @@ A working MCP server demonstrating the core pipeline: LLM test generation → in
 
 ---
 
+---
+
+## Key Design Decisions Demonstrated
+
+**Optimisation 9.1 — Prompt caching structure:** The spec context is the system prompt (stable prefix), the per-endpoint task is the user message (volatile). Cache-eligible on Anthropic Claude.
+
+**Optimisation 9.2 — Model routing:** All calls use Haiku in the POC; in the full system, security probes and BREAKING drift patches route to a larger model.
+
+**Optimisation 9.3 — Deterministic validation:** Every LLM output has its `id` rewritten to a canonical form and `enabled` normalised before entering the executor.
+
+**Section 8.3.1 — test-review MCP App:** Full MCP Apps protocol — `ui/initialize` handshake, `hostContext` theme injection, `ui/update-model-context` for structured approval payload, `ui/clipboard-write` for copy, `ui/notifications/size-changed` for dynamic resize.
+
+**Section 8.3.2 — healing-diff MCP App:** Full MCP Apps protocol — side-by-side line diff with syntax highlighting, `ui/message` for Approve/Reject decisions, collapsible LLM reasoning, `ui/clipboard-write` for diff export.
+
+---
+
 ## What This Demonstrates
 
 | Stage | Component | Technology |
@@ -143,22 +159,6 @@ src/
     test-review.ts      ← test-review MCP App HTML (toggle table)
     healing-diff.ts     ← healing-diff MCP App HTML (side-by-side diff)
 ```
-
----
-
-## Key Design Decisions Demonstrated
-
-**Optimisation 9.1 — Prompt caching structure:** The spec context is the system prompt (stable prefix), the per-endpoint task is the user message (volatile). Cache-eligible on Anthropic Claude.
-
-**Optimisation 9.2 — Model routing:** All calls use Haiku in the POC; in the full system, security probes and BREAKING drift patches route to a larger model.
-
-**Optimisation 9.3 — Deterministic validation:** Every LLM output has its `id` rewritten to a canonical form and `enabled` normalised before entering the executor.
-
-**Section 8.3.1 — test-review MCP App:** Full MCP Apps protocol — `ui/initialize` handshake, `hostContext` theme injection, `ui/update-model-context` for structured approval payload, `ui/clipboard-write` for copy, `ui/notifications/size-changed` for dynamic resize.
-
-**Section 8.3.2 — healing-diff MCP App:** Full MCP Apps protocol — side-by-side line diff with syntax highlighting, `ui/message` for Approve/Reject decisions, collapsible LLM reasoning, `ui/clipboard-write` for diff export.
-
----
 
 *Built for GSoC 2026 — Agentic API Testing for API Dash*  
 *Himanshu Ravindra Iwanati — IIT Kharagpur*
