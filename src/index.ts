@@ -1,8 +1,9 @@
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-import { PETSTORE_SPEC, DRIFTED_PET_RESPONSE } from "./constants.js";
+import { PETSTORE_SPEC, DRIFTED_PET_RESPONSE, SEED_PET_ID_TEST } from "./constants.js";
 import {
   createSession,
   getOrCreateDefaultSession,
@@ -166,7 +167,21 @@ Requires parse_spec to have been called first.`,
     }
 
     // LLM test generation
-    const tests = await generateTestsForEndpoints(endpoints);
+    const llmTests = await generateTestsForEndpoints(endpoints);
+
+    // Inject seed test for GET /pet/{petId} drift simulation.
+    // Remove any LLM-generated test that already covers the same endpoint+field
+    // to avoid duplicates, then prepend our guaranteed sentinel.
+    const petEndpointIncluded = endpoints.some(
+      (e) => e.method === "GET" && e.path === "/pet/{petId}"
+    );
+    const withoutDuplicate = llmTests.filter(
+      (t) => !(t.path === "/pet/{petId}" &&
+               t.assertions.some((a) => a.field === "response.body.id" && a.operator === "type_is"))
+    );
+    const tests = petEndpointIncluded
+      ? [SEED_PET_ID_TEST, ...withoutDuplicate]
+      : llmTests;
 
     latestSession = updateSession(session.id, {
       state: "AWAITING_APPROVAL",
