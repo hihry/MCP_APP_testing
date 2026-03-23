@@ -2,9 +2,9 @@
 
 **GSoC 2026 POC — Agentic API Testing for API Dash**  
 A working MCP server demonstrating the core pipeline: LLM test generation → interactive approval → execution → schema drift detection → visual patch review.
-Visual Demonstration : https://www.youtube.com/watch?v=yynRa-KTfcY
 ---
 
+Visual Demonstration : https://www.youtube.com/watch?v=yynRa-KTfcY 
 ## Key Design Decisions Demonstrated
 
 **Optimisation 9.1 — Prompt caching structure:** The spec context is the system prompt (stable prefix), the per-endpoint task is the user message (volatile). Cache-eligible on Anthropic Claude.
