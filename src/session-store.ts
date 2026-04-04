@@ -1,13 +1,41 @@
 import type { AgentSession, AgentState } from "./types.js";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 // ─── In-Memory Session Store ────────────────────────────────────────────────
 // In the full system this is backed by AgentCore's persistent session manager.
 // For the POC we use a simple Map — sufficient for a single demo session.
 
 const sessions = new Map<string, AgentSession>();
+const STORE_FILE = join(process.cwd(), ".mcp", "sessions.json");
+
+function saveSessions(): void {
+  const payload = JSON.stringify([...sessions.values()], null, 2);
+  mkdirSync(dirname(STORE_FILE), { recursive: true });
+  writeFileSync(STORE_FILE, payload, "utf8");
+}
+
+function loadSessions(): void {
+  if (!existsSync(STORE_FILE)) {
+    return;
+  }
+
+  try {
+    const content = readFileSync(STORE_FILE, "utf8");
+    const parsed = JSON.parse(content) as AgentSession[];
+
+    for (const session of parsed) {
+      sessions.set(session.id, session);
+    }
+  } catch {
+    // Ignore malformed/corrupted store and start with an empty in-memory map.
+  }
+}
+
+loadSessions();
 
 export function createSession(): AgentSession {
-  const id = `sess_${Date.now()}`;
+  const id = `sess_${Date.now()}_${Math.floor(Math.random() * 10_000)}`;
   const session: AgentSession = {
     id,
     state: "IDLE",
@@ -19,6 +47,7 @@ export function createSession(): AgentSession {
     updatedAt: new Date().toISOString(),
   };
   sessions.set(id, session);
+  saveSessions();
   return session;
 }
 
@@ -38,6 +67,7 @@ export function updateSession(
     updatedAt: new Date().toISOString(),
   };
   sessions.set(id, updated);
+  saveSessions();
   return updated;
 }
 
