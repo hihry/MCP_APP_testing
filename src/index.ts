@@ -7,6 +7,7 @@ import { PETSTORE_SPEC, DRIFTED_PET_RESPONSE, SEED_PET_ID_TEST } from "./constan
 import {
   createSession,
   getOrCreateDefaultSession,
+  getSession,
   updateSession,
   transitionState,
 } from "./session-store.js";
@@ -31,6 +32,14 @@ const URI_BASE = "ui://apidash-agent";
 // UI resources are fetched by URI — we store latest session for resource rendering
 
 let latestSession: AgentSession = getOrCreateDefaultSession();
+
+function resolveSession(sessionId?: string): AgentSession | undefined {
+  const session = sessionId ? getSession(sessionId) : latestSession;
+  if (session) {
+    latestSession = session;
+  }
+  return session;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TOOL 1: parse_spec
@@ -137,7 +146,16 @@ Requires parse_spec to have been called first.`,
     },
   },
   async ({ session_id, endpoint_filter }) => {
-    const session = latestSession;
+    const session = resolveSession(session_id);
+    if (!session) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `❌ Session not found: ${session_id}. Run parse_spec first.`,
+        }],
+      };
+    }
+
     if (!session.spec) {
       return {
         content: [{
@@ -225,6 +243,9 @@ Each test is run sequentially, assertions are evaluated, and results are collect
 Returns a pass/fail summary. Automatically detects schema drift if failures occur.
 Call after the user has confirmed their selection in the test-review MCP App.`,
     inputSchema: {
+      session_id: z.string()
+        .optional()
+        .describe("Session ID from parse_spec. Uses latest session if omitted."),
       approved_test_ids: z.array(z.string())
         .optional()
         .describe("Array of test IDs to run. Runs all enabled tests if omitted."),
@@ -240,8 +261,17 @@ Call after the user has confirmed their selection in the test-review MCP App.`,
       openWorldHint: true,    // makes real HTTP calls
     },
   },
-  async ({ approved_test_ids, simulate_drift }) => {
-    const session = latestSession;
+  async ({ session_id, approved_test_ids, simulate_drift }) => {
+    const session = resolveSession(session_id);
+    if (!session) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `❌ Session not found: ${session_id}. Run parse_spec first.`,
+        }],
+      };
+    }
+
     if (session.generatedTests.length === 0) {
       return {
         content: [{
@@ -354,8 +384,16 @@ Requires execute_tests to have been run first with failures present.`,
       ui: { resourceUri: `${URI_BASE}/healing-diff` },
     },
   },
-  async () => {
-    const session = latestSession;
+  async ({ session_id }) => {
+    const session = resolveSession(session_id);
+    if (!session) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `❌ Session not found: ${session_id}. Run parse_spec first.`,
+        }],
+      };
+    }
 
     if (session.executionResults.length === 0) {
       return {
@@ -446,7 +484,11 @@ server.registerTool(
     description: `Returns the current state of the agent session including pipeline stage,
 test counts, execution results summary, and any pending healing patches.
 Use at any point to check where the pipeline is.`,
-    inputSchema: {},
+    inputSchema: {
+      session_id: z.string()
+        .optional()
+        .describe("Session ID from parse_spec. Uses latest session if omitted."),
+    },
     annotations: {
       readOnlyHint: true,
       destructiveHint: false,
@@ -454,8 +496,17 @@ Use at any point to check where the pipeline is.`,
       openWorldHint: false,
     },
   },
-  async () => {
-    const session = latestSession;
+  async ({ session_id }) => {
+    const session = resolveSession(session_id);
+    if (!session) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: `❌ Session not found: ${session_id}. Run parse_spec first.`,
+        }],
+      };
+    }
+
     const results = session.executionResults;
     const passed  = results.filter((r) => r.status === "passed").length;
     const failed  = results.filter((r) => r.status === "failed").length;
