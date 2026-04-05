@@ -1,6 +1,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { z } from "zod";
 
 import { PETSTORE_SPEC, DRIFTED_PET_RESPONSE, SEED_PET_ID_TEST } from "./constants.js";
@@ -647,11 +648,62 @@ server.registerResource(
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const transport = new StdioServerTransport();
+  const app = createMcpExpressApp();
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+  });
+
   await server.connect(transport);
-  console.error("🚀 apidash-agent-mcp running on stdio");
-  console.error("   Tools: parse_spec | generate_tests | execute_tests | detect_and_heal | get_status");
-  console.error("   MCP Apps: test-review | healing-diff");
+
+  app.post("/mcp", async (req, res) => {
+    try {
+      await transport.handleRequest(req, res, req.body);
+    } catch (error) {
+      console.error("Error handling MCP request:", error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: "2.0",
+          error: {
+            code: -32603,
+            message: "Internal server error",
+          },
+          id: null,
+        });
+      }
+    }
+  });
+
+  app.get("/mcp", (_req, res) => {
+    res.status(405).json({
+      jsonrpc: "2.0",
+      error: {
+        code: -32000,
+        message: "Method not allowed.",
+      },
+      id: null,
+    });
+  });
+
+  app.delete("/mcp", (_req, res) => {
+    res.status(405).json({
+      jsonrpc: "2.0",
+      error: {
+        code: -32000,
+        message: "Method not allowed.",
+      },
+      id: null,
+    });
+  });
+
+  const port = Number.parseInt(process.env.PORT || "8000", 10);
+  const host = process.env.HOST || "0.0.0.0";
+
+  app.listen(port, host, () => {
+    console.error(`🚀 MCP server running at http://${host}:${port}`);
+    console.error(`📡 MCP endpoint: http://${host}:${port}/mcp`);
+    console.error("   Tools: parse_spec | generate_tests | execute_tests | detect_and_heal | get_status");
+    console.error("   MCP Apps: test-review | healing-diff");
+  });
 }
 
 main().catch((err) => {
