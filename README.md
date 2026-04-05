@@ -49,6 +49,38 @@ npm install
 npm run build
 ```
 
+## Docker Build (amd64 and arm64)
+
+Use these commands from the workspace root so Docker gets the correct build context.
+
+Build for local testing on amd64:
+
+```bash
+docker build --platform linux/amd64 -t sales-mcp-apps -f ./Dockerfile .
+```
+
+Prepare buildx once (required for cross-arch builds):
+
+```bash
+docker buildx create --name multiarch --use
+docker buildx inspect --bootstrap
+```
+
+Build and push a multi-arch image (amd64 + arm64):
+
+```bash
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t <your-registry>/sales-mcp-apps:latest \
+  -f ./Dockerfile \
+  --push \
+  .
+```
+
+Notes:
+- `--push` is required for true multi-arch manifests.
+- If you only need a local image, build a single platform (`linux/amd64` or `linux/arm64`) with `docker build`.
+
 Set your API key:
 ```bash
 # macOS/Linux
