@@ -2,7 +2,7 @@
   {
     "name": "default",
     "description": "Production deployment",
-    "account": "YOUR_ACCOUNT_ID",
+    "account": "<aws_account_id>",
     "region": "us-east-1"
   }
 ]

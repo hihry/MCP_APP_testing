@@ -12,9 +12,21 @@
       "name": "apidashMCPagent",
       "build": "Container",
       "entrypoint": "dist/index.js",
-      "codeLocation": ".",
+      "codeLocation": "app",
       "runtimeVersion": "NODE_22",
       "protocol": "MCP",
+      "authorizerType": "CUSTOM_JWT",
+      "authorizerConfiguration": {
+        "customJwtAuthorizer": {
+          "discoveryUrl": "https://cognito-idp.us-east-1.amazonaws.com/<user_pool_id>/.well-known/openid-configuration",
+          "allowedClients": [
+            "<cognito_app_client_id>"
+          ],
+          "allowedScopes": [
+            "salesmcpapps-auth/invoke"
+          ]
+        }
+      },
       "tags": {}
     }
   ],

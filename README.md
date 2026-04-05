@@ -49,6 +49,64 @@ npm install
 npm run build
 ```
 
+## Quick Start (AgentCore + Cognito JWT)
+
+Use this minimal PowerShell flow for a clean end-to-end setup.
+
+1. Create Cognito pool and unique domain:
+
+```powershell
+$REGION = "us-east-1"
+$POOL_ID = aws cognito-idp create-user-pool --pool-name "salesmcpapps-pool" --region $REGION --query "UserPool.Id" --output text
+$DOMAIN = "salesmcpapps-auth-395590"
+aws cognito-idp create-user-pool-domain --user-pool-id $POOL_ID --domain $DOMAIN --region $REGION
+```
+
+2. Create resource scope and app client:
+
+```powershell
+$IDENTIFIER = "salesmcpapps-auth"
+aws cognito-idp create-resource-server --user-pool-id $POOL_ID --identifier $IDENTIFIER --name "Sales MCP Apps" --scopes ScopeName=invoke,ScopeDescription="Invoke MCP server" --region $REGION
+$CLIENT_OUTPUT = aws cognito-idp create-user-pool-client --user-pool-id $POOL_ID --client-name "salesmcpapps-client" --generate-secret --explicit-auth-flows ALLOW_USER_PASSWORD_AUTH ALLOW_REFRESH_TOKEN_AUTH --allowed-o-auth-flows client_credentials --allowed-o-auth-scopes "salesmcpapps-auth/invoke" --allowed-o-auth-flows-user-pool-client --supported-identity-providers COGNITO --region $REGION
+$clientObj = $CLIENT_OUTPUT | ConvertFrom-Json
+$CLIENT_ID = $clientObj.UserPoolClient.ClientId
+$CLIENT_SECRET = $clientObj.UserPoolClient.ClientSecret
+```
+
+3. Deploy AgentCore runtime:
+
+```powershell
+Push-Location ".\\apidashMCPagent"
+try {
+  agentcore deploy --target default --yes
+} finally {
+  Pop-Location
+}
+```
+
+4. Get access token:
+
+```powershell
+$resp = Invoke-RestMethod -Method Post -Uri "https://$DOMAIN.auth.$REGION.amazoncognito.com/oauth2/token" -ContentType "application/x-www-form-urlencoded" -Body "grant_type=client_credentials&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET&scope=salesmcpapps-auth/invoke"
+$TOKEN = $resp.access_token
+```
+
+5. Call initialize on deployed runtime:
+
+```powershell
+$state = Get-Content ".\\apidashMCPagent\\agentcore\\.cli\\deployed-state.json" -Raw | ConvertFrom-Json
+$runtimeObj = $state.targets.default.resources.runtimes.PSObject.Properties | Select-Object -First 1 -ExpandProperty Value
+$ENCODED_ARN = [uri]::EscapeDataString($runtimeObj.runtimeArn)
+$url = "https://bedrock-agentcore.$REGION.amazonaws.com/runtimes/$ENCODED_ARN/invocations"
+$headers = @{"Content-Type"="application/json";"Accept"="application/json, text/event-stream";"Authorization"="Bearer $TOKEN";"User-Agent"="test-client/1.0"}
+$body = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}'
+Invoke-RestMethod -Method Post -Uri $url -Headers $headers -Body $body
+```
+
+Notes:
+- For VS Code `.vscode/mcp.json`, use the same runtime ARN but double-encoded in the URL.
+- If domain creation fails, pick a different unique suffix.
+
 ## Docker Build (amd64 and arm64)
 
 Use these commands from the workspace root so Docker gets the correct build context.
@@ -94,6 +152,224 @@ setx ANTHROPIC_API_KEY "sk-ant-..."
 ```
 
 If you use `setx`, restart VS Code Insiders so it picks up the updated environment variable.
+
+---
+
+## AgentCore Deploy with Cognito JWT (Windows PowerShell)
+
+This section captures the full production-style deployment flow for this repo using:
+
+- AgentCore runtime deployment
+- Cognito client credentials flow
+- Custom JWT authorizer in `agentcore.json`
+- VS Code MCP HTTP connection
+
+### 1) Project Layout for AgentCore
+
+AgentCore project root in this workspace:
+
+- `apidashMCPagent/`
+
+Runtime application code is intentionally isolated under:
+
+- `apidashMCPagent/app/`
+
+This avoids CDK recursive asset copy and path-length issues during synth/deploy.
+
+### 2) Create Cognito User Pool and Domain
+
+Set region:
+
+```powershell
+$REGION = "us-east-1"
+```
+
+Create user pool:
+
+```powershell
+$POOL_ID = aws cognito-idp create-user-pool `
+  --pool-name "salesmcpapps-pool" `
+  --region $REGION `
+  --query "UserPool.Id" --output text
+
+Write-Host "Pool ID: $POOL_ID"
+```
+
+Create domain (must be globally unique):
+
+```powershell
+$DOMAIN = "salesmcpapps-auth-395590"
+aws cognito-idp create-user-pool-domain `
+  --user-pool-id $POOL_ID `
+  --domain $DOMAIN `
+  --region $REGION
+```
+
+If you get "Domain already exists", reuse that domain if it is yours, or choose a new suffix.
+
+### 3) Create Resource Server Scope and App Client
+
+Create or update resource server scope:
+
+```powershell
+$IDENTIFIER = "salesmcpapps-auth"
+
+$createRs = aws cognito-idp create-resource-server `
+  --user-pool-id $POOL_ID `
+  --identifier $IDENTIFIER `
+  --name "Sales MCP Apps" `
+  --scopes ScopeName=invoke,ScopeDescription="Invoke MCP server" `
+  --region $REGION 2>&1
+
+if ($LASTEXITCODE -ne 0 -and ($createRs -match "ResourceServerAlreadyExistsException")) {
+  aws cognito-idp update-resource-server `
+    --user-pool-id $POOL_ID `
+    --identifier $IDENTIFIER `
+    --name "Sales MCP Apps" `
+    --scopes ScopeName=invoke,ScopeDescription="Invoke MCP server" `
+    --region $REGION | Out-Null
+}
+```
+
+Create app client:
+
+```powershell
+$CLIENT_OUTPUT = aws cognito-idp create-user-pool-client `
+  --user-pool-id $POOL_ID `
+  --client-name "salesmcpapps-client" `
+  --generate-secret `
+  --explicit-auth-flows ALLOW_USER_PASSWORD_AUTH ALLOW_REFRESH_TOKEN_AUTH `
+  --allowed-o-auth-flows client_credentials `
+  --allowed-o-auth-scopes "salesmcpapps-auth/invoke" `
+  --allowed-o-auth-flows-user-pool-client `
+  --supported-identity-providers COGNITO `
+  --region $REGION
+
+$clientObj = $CLIENT_OUTPUT | ConvertFrom-Json
+$CLIENT_ID = $clientObj.UserPoolClient.ClientId
+$CLIENT_SECRET = $clientObj.UserPoolClient.ClientSecret
+
+Write-Host "Client ID: $CLIENT_ID"
+Write-Host "Client Secret: $CLIENT_SECRET"
+Write-Host "Discovery URL: https://cognito-idp.$REGION.amazonaws.com/$POOL_ID/.well-known/openid-configuration"
+```
+
+### 4) Configure JWT Authorizer in AgentCore Runtime
+
+In `apidashMCPagent/agentcore/agentcore.json`, runtime config must include:
+
+- `authorizerType: CUSTOM_JWT`
+- `authorizerConfiguration.customJwtAuthorizer.discoveryUrl`
+- `authorizerConfiguration.customJwtAuthorizer.allowedClients`
+- `authorizerConfiguration.customJwtAuthorizer.allowedScopes`
+
+Current expected scope:
+
+- `salesmcpapps-auth/invoke`
+
+### 5) Deploy Runtime
+
+Run deploy from the AgentCore project directory:
+
+```powershell
+Push-Location ".\apidashMCPagent"
+try {
+  agentcore deploy --target default --yes
+} finally {
+  Pop-Location
+}
+```
+
+### 6) Fetch OAuth Access Token
+
+```powershell
+$resp = Invoke-RestMethod -Method Post `
+  -Uri "https://$DOMAIN.auth.$REGION.amazoncognito.com/oauth2/token" `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body "grant_type=client_credentials&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET&scope=salesmcpapps-auth/invoke"
+
+$TOKEN = $resp.access_token
+Write-Host "TOKEN=$TOKEN"
+```
+
+### 7) Test MCP Initialize via Invoke API
+
+Read runtime ARN from deployed state:
+
+```powershell
+$state = Get-Content ".\apidashMCPagent\agentcore\.cli\deployed-state.json" -Raw | ConvertFrom-Json
+$runtimeObj = $state.targets.default.resources.runtimes.PSObject.Properties | Select-Object -First 1 -ExpandProperty Value
+$RUNTIME_ARN = $runtimeObj.runtimeArn
+```
+
+Use single-encoded ARN for direct API calls:
+
+```powershell
+$ENCODED_ARN = [uri]::EscapeDataString($RUNTIME_ARN)
+$url = "https://bedrock-agentcore.$REGION.amazonaws.com/runtimes/$ENCODED_ARN/invocations"
+
+$headers = @{
+  "Content-Type" = "application/json"
+  "Accept" = "application/json, text/event-stream"
+  "Authorization" = "Bearer $TOKEN"
+  "User-Agent" = "test-client/1.0"
+}
+
+$body = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}'
+
+Invoke-RestMethod -Method Post -Uri $url -Headers $headers -Body $body
+```
+
+### 8) Connect from VS Code (.vscode/mcp.json)
+
+Use HTTP MCP server config:
+
+```json
+{
+  "servers": {
+    "apidash-mcp-apps": {
+      "type": "http",
+      "url": "https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/arn%253Aaws%253Abedrock-agentcore%253Aus-east-1%253A<aws_account_id>%253Aruntime%252F<runtime_id>/invocations",
+      "headers": {
+        "Authorization": "Bearer ${env:AGENTCORE_BEARER_TOKEN}",
+        "User-Agent": "vscode-mcp-client/1.0"
+      }
+    }
+  }
+}
+```
+
+Important: in `mcp.json`, the runtime ARN in the URL must be double-encoded.
+
+### 9) Troubleshooting Notes
+
+- If you see `exec /bin/sh: exec format error` in Docker build, remove hardcoded arm64 from Dockerfile and build for your local platform.
+- If `docker run -p 8000:8000 ...` fails with `port is already allocated`, move to another host port (for example `-p 8001:8000`) or stop the conflicting container.
+- If Cognito domain create fails with "already associated" or "already exists", choose a unique domain prefix.
+- If initialize returns runtime 403 with valid token, inspect CloudWatch logs for runtime-specific authorization details.
+
+### 10) Cleanup
+
+Delete AgentCore stack:
+
+```powershell
+aws cloudformation delete-stack `
+  --stack-name AgentCore-apidashMCPagent-default `
+  --region $REGION
+```
+
+Delete Cognito domain and user pool:
+
+```powershell
+aws cognito-idp delete-user-pool-domain `
+  --user-pool-id $POOL_ID `
+  --domain $DOMAIN `
+  --region $REGION
+
+aws cognito-idp delete-user-pool `
+  --user-pool-id $POOL_ID `
+  --region $REGION
+```
 
 ---
 
