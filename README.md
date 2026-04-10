@@ -234,5 +234,5 @@ Dockerfile              ← Multi-stage build, PORT=8000, HOST=0.0.0.0
 
 ---
 
-*GSoC 2026 — Agentic API Testing for API Dash*  
-*Himanshu Ravindra Iwanati — IIT Kharagpur*
+*GSoC 2026 — Agentic API Testing POC for API Dash*  
+*Himanshu Ravindra Iwanati*
